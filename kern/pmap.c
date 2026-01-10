@@ -64,8 +64,8 @@ i386_detect_memory(void)
 	npages = totalmem / (PGSIZE / 1024);
 	npages_basemem = basemem / (PGSIZE / 1024);
 
-	cprintf("Physical memory: %uK available, base = %uK, extended = %uK\n",
-		totalmem, basemem, totalmem - basemem);
+	cprintf("Physical memory: %uK available, base = %uK, extended = %uK, npages = %u\n",
+		totalmem, basemem, totalmem - basemem, npages);
 }
 
 
@@ -107,6 +107,7 @@ boot_alloc(uint32_t n)
 	// to any kernel code or global variables.
 	if (!nextfree) {
 		extern char end[];
+		cprintf("end = [%08x]\n", end);
 		nextfree = ROUNDUP((char *) end, PGSIZE);
 	}
 

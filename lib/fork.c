@@ -1,5 +1,6 @@
 // implement fork from user space
 
+#include "inc/mmu.h"
 #include <inc/string.h>
 #include <inc/lib.h>
 #include <inc/x86.h>
@@ -69,6 +70,7 @@ duppage(envid_t envid, unsigned pn)
 	// LAB 4: Your code here.
 	uint32_t perm = uvpt[pn] & PTE_SYSCALL;
 	void *addr = (void *) (pn * PGSIZE);
+	cprintf("duppage: [%08x]\n", addr);
 
 	if ((perm & PTE_W) || (perm & PTE_COW)) {
 		perm |= PTE_COW;
@@ -84,6 +86,22 @@ duppage(envid_t envid, unsigned pn)
 		if ((r = sys_page_map(0, addr, envid, addr, perm)) < 0) {
 			return r;
 		}
+	}
+	return 0;
+}
+
+static int
+duppage_s(envid_t envid, unsigned pn)
+{
+	int r;
+
+	// LAB 4: Your code here.
+	uint32_t perm = uvpt[pn] & PTE_SYSCALL;
+	void *addr = (void *) (pn * PGSIZE);
+	cprintf("duppage_s: [%08x]\n", addr);
+
+	if ((r = sys_page_map(0, addr, envid, addr, perm)) < 0) {
+		return r;
 	}
 	return 0;
 }
@@ -118,7 +136,7 @@ fork(void)
 	}
 
 	if (envid == 0) {  // child
-		thisenv = &envs[ENVX(sys_getenvid())];
+		//thisenv = &envs[ENVX(sys_getenvid())];
 		return 0;
 	}
 
@@ -147,6 +165,43 @@ fork(void)
 int
 sfork(void)
 {
-	panic("sfork not implemented");
-	return -E_INVAL;
+	// LAB 4: Your code here.
+	envid_t envid;
+	uint32_t addr;
+	int r;
+
+	set_pgfault_handler(pgfault);
+	if ((envid = sys_exofork()) < 0) {
+		return envid;
+	}
+
+	if (envid == 0) {  // child
+		//thisenv = &envs[ENVX(sys_getenvid())];
+		return 0;
+	}
+
+	// parent
+	for (addr = 0; addr < USTACKTOP; addr += PGSIZE) {
+		if ((uvpd[PDX(addr)] & PTE_P) && (uvpt[PGNUM(addr)] & PTE_P)) {
+			if (addr == USTACKTOP - PGSIZE) {
+				duppage(envid, PGNUM(addr));
+			}
+			else {
+				duppage_s(envid, PGNUM(addr));
+			}
+		}
+	}
+
+	// set_pgfault_handler() on child
+	if ((r = sys_page_alloc(envid, (void *) UXSTACKTOP - PGSIZE, PTE_W | PTE_U | PTE_P)) < 0) {
+		panic("fork: sys_page_alloc: %e\n", r);
+	}
+	void _pgfault_upcall();
+	if ((r = sys_env_set_pgfault_upcall(envid, _pgfault_upcall)) < 0) {
+		panic("fork: sys_env_set_pgfault_upcall: %e\n", r);
+	}
+	if ((r = sys_env_set_status(envid, ENV_RUNNABLE)) < 0) {
+		panic("fork: sys_env_set_status: %e\n", r);
+	}
+	return envid;
 }

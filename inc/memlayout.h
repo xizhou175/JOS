@@ -82,6 +82,19 @@
  *     there if desired.  JOS user programs map pages temporarily at UTEMP.
  */
 
+/*
+physical address of page directory is mapped to ef7bd, which means physical
+address of all page tables are stored in [ef7bd000 ~ ef7be000]. All page tables are
+mapped to the rest of space in [UVPT, ULIM]. They store physical address of
+other pages.
+
+[ef400-ef7ff]  PDE[3bd]     -------U-P
+  [ef7bc-ef7bc]  PTE[3bc]     -------UWP 003fd
+  [ef7bd-ef7bd]  PTE[3bd]     -------U-P 0011a
+  [ef7bf-ef7bf]  PTE[3bf]     -------UWP 003fe
+  [ef7c0-ef7df]  PTE[3c0-3df] ----A--UWP 003ff 003fc 003fb 003fa 003f9 003f8 ..
+  [ef7e0-ef7ff]  PTE[3e0-3ff] -------UWP 003dd 003dc 003db 003da 003d9 003d8 ..
+*/
 
 // All physical memory mapped at this address
 #define	KERNBASE	0xF0000000
