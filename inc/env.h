@@ -28,6 +28,7 @@ typedef int32_t envid_t;
 #define LOG2NENV		10
 #define NENV			(1 << LOG2NENV)
 #define ENVX(envid)		((envid) & (NENV - 1))
+#define NMSG            20
 
 // Values of env_status in struct Env
 enum {
@@ -42,6 +43,45 @@ enum {
 enum EnvType {
 	ENV_TYPE_USER = 0,
 };
+struct Message {
+	struct PageInfo* pp;		// VA at which to map received page
+	uint32_t env_ipc_value;		// Data value sent to us
+	envid_t env_ipc_from;		// envid of the sender
+	int env_ipc_perm;		    // Perm of page mapping received
+};
+
+struct Queue {
+	struct Message msg[NMSG];
+	int front;
+	int back;
+};
+
+static inline bool is_full(const struct Queue* q) {
+	return q->back == q->front || (q->front == -1 && q->back == NMSG - 1);
+}
+
+static inline bool is_empty(const struct Queue* q) {
+	return q->back - 1 == q->front;
+}
+
+static inline struct Message* enqueue(struct Queue* q) {
+	if (is_full(q)) {
+		return NULL;
+	}
+	struct Message *ret = &q->msg[q->back];
+	q->back = q->back + 1 >= NMSG ? 0 : q->back + 1;
+	return ret;
+}
+
+static inline struct Message* dequeue(struct Queue* q) {
+	if (is_empty(q)) {
+		return NULL;
+	}
+	q->front == NMSG - 1 ? -1 : q->front;
+	struct Message *msg = &q->msg[q->front + 1];
+	q->front++;
+	return msg;
+}
 
 struct Env {
 	struct Trapframe env_tf;	// Saved registers
@@ -60,11 +100,13 @@ struct Env {
 	void *env_pgfault_upcall;	// Page fault upcall entry point
 
 	// Lab 4 IPC
-	bool env_ipc_recving;		// Env is blocked receiving
-	void *env_ipc_dstva;		// VA at which to map received page
+	//bool env_ipc_recving;		// Env is blocked receiving
+	//void *env_ipc_dstva;		// VA at which to map received page
 	uint32_t env_ipc_value;		// Data value sent to us
-	envid_t env_ipc_from;		// envid of the sender
+	//envid_t env_ipc_from;		// envid of the sender
 	int env_ipc_perm;		// Perm of page mapping received
+
+	struct Queue mailbox;
 };
 
 #endif // !JOS_INC_ENV_H

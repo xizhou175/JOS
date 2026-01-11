@@ -1,5 +1,6 @@
 /* See COPYRIGHT for copyright information. */
 
+#include "inc/env.h"
 #include <inc/x86.h>
 #include <inc/mmu.h>
 #include <inc/error.h>
@@ -286,11 +287,14 @@ _env_alloc(struct Env **newenv_store, envid_t parent_id)
 	e->env_pgfault_upcall = 0;
 
 	// Also clear the IPC receiving flag.
-	e->env_ipc_recving = 0;
+	//e->env_ipc_recving = 0;
 
 	// commit the allocation
 	env_free_list = e->env_link;
 	*newenv_store = e;
+
+	e->mailbox.front = -1;
+	e->mailbox.back = 0;
 
 	cprintf("[%08x] new env %08x\n", curenv ? curenv->env_id : 0, e->env_id);
 	return 0;

@@ -1,5 +1,7 @@
 // User-level IPC library routines
 
+#include "inc/env.h"
+#include "inc/error.h"
 #include <inc/lib.h>
 
 // Receive a value via IPC and return it.
@@ -23,8 +25,13 @@ int32_t
 ipc_recv(envid_t *from_env_store, void *pg, int *perm_store)
 {
 	int r;
+	int val = 0;
 
-	if ((r = sys_ipc_recv(pg == NULL ? (void *)UTOP : pg)) < 0) {
+	while (is_empty(&thisenv->mailbox)) {
+		sys_yield();
+	}
+
+	if ((r = sys_ipc_recv(pg == NULL ? (void *)UTOP : pg, &val, from_env_store, perm_store)) < 0) {
 		if (from_env_store != NULL) {
 			*from_env_store = 0;
 		}
@@ -33,13 +40,7 @@ ipc_recv(envid_t *from_env_store, void *pg, int *perm_store)
 		}
 		return r;
 	}
-	if (from_env_store != NULL) {
-		*from_env_store = thisenv->env_ipc_from;
-	}
-	if (perm_store != NULL) {
-		*perm_store = thisenv->env_ipc_perm;
-	}
-	return thisenv->env_ipc_value;
+	return val;
 }
 
 // Send 'val' (and 'pg' with 'perm', if 'pg' is nonnull) to 'toenv'.
@@ -54,20 +55,24 @@ void
 ipc_send(envid_t to_env, uint32_t val, void *pg, int perm)
 {
 	int r;
-	
-	pg = pg == NULL ? (void *) UTOP : pg;
-	for (;;) {
-		if ((r = sys_ipc_try_send(to_env, val, pg, perm)) < 0) {
-			if (r == -E_IPC_NOT_RECV) {
-				sys_yield();
-				continue;
-			} else {
-				panic("ipc_send: sys_ipc_try_send: %e\n", r);
-			}
-		} else {
-			break;
-		}
+
+	while (is_full(&thisenv->mailbox)) {
+		sys_yield();
 	}
+
+	pg = pg == NULL ? (void *) UTOP : pg;
+	//for (;;) {
+	if ((r = sys_ipc_try_send(to_env, val, pg, perm)) < 0) {
+		if (r == -E_IPC_NOT_RECV) {
+			cprintf("Failed to send value: %u", val);
+			//continue;
+		} else {
+			panic("ipc_send: sys_ipc_try_send: %e\n", r);
+		}
+	} //else {
+		//break;
+	//}
+	//}
 }
 
 // Find the first environment of the given type.  We'll use this to
