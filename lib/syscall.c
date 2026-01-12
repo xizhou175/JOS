@@ -111,3 +111,8 @@ sys_ipc_recv(void *dstva, void *val, void *from_env, void* perm)
 	return syscall(SYS_ipc_recv, 1, (uint32_t)dstva, (uint32_t)val, (uint32_t)from_env, (uint32_t)perm, 0);
 }
 
+int
+sys_env_msg_state(envid_t to_env)
+{
+	return syscall(SYS_msg_state, 0, to_env, 0, 0, 0, 0);
+}

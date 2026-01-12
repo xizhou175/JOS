@@ -69,6 +69,49 @@ void _env_create(uint8_t *binary, enum EnvType type);
 void _env_free(struct Env *e);
 void _env_destroy(struct Env *e);
 
+bool is_full(const struct Queue* q) {
+	spin_lock(&((struct Queue*)(q))->q_lock);
+	if (q->back == q->front || (q->front == -1 && q->back == NMSG - 1)) {
+		spin_unlock(&((struct Queue*)(q))->q_lock);
+		return true;
+	}
+	spin_unlock(&((struct Queue*)(q))->q_lock);
+	return false;
+}
+
+bool is_empty(const struct Queue* q) {
+	spin_lock(&((struct Queue*)(q))->q_lock);
+	if (q->back - 1 == q->front) {
+		spin_unlock(&((struct Queue*)(q))->q_lock);
+		return true;
+	}
+	spin_unlock(&((struct Queue*)(q))->q_lock);
+	return false;
+}
+
+struct Message* enqueue(struct Queue* q) {
+	if (is_full(q)) {
+		return NULL;
+	}
+	spin_lock(&((struct Queue*)(q))->q_lock);
+	struct Message *ret = &q->msg[q->back];
+	q->back = q->back + 1 >= NMSG ? 0 : q->back + 1;
+	spin_unlock(&((struct Queue*)(q))->q_lock);
+	return ret;
+}
+
+struct Message* dequeue(struct Queue* q) {
+	if (is_empty(q)) {
+		return NULL;
+	}
+	spin_lock(&((struct Queue*)(q))->q_lock);
+	q->front == NMSG - 1 ? -1 : q->front;
+	struct Message *msg = &q->msg[q->front + 1];
+	q->front++;
+	spin_unlock(&((struct Queue*)(q))->q_lock);
+	return msg;
+}
+
 //
 // Converts an envid to an env pointer.
 // If checkperm is set, the specified environment must be either the

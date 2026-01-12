@@ -1,5 +1,6 @@
 /* See COPYRIGHT for copyright information. */
 
+#include "inc/syscall.h"
 #include "inc/env.h"
 #include "inc/memlayout.h"
 #include <inc/x86.h>
@@ -473,6 +474,30 @@ sys_ipc_recv(void *dstva, int* val, envid_t *from_env_store, int *perm_store)
 	return 0;
 }
 
+static int
+sys_env_msg_state(envid_t envid)
+{
+	int r;
+	struct Env *env;
+	spin_lock(&env_lock);
+	if ((r = _envid2env(envid, &env, 0)) < 0) {
+		spin_unlock(&env_lock);
+		return r;
+	}
+	int state;
+	if (is_empty(&env->mailbox)) {
+		state = MSG_EMPTY;
+	}
+	else if (is_full(&env->mailbox)) {
+		state = MSG_FULL;
+	}
+	else {
+		state = MSG_FREE;
+	}
+	spin_unlock(&env_lock);
+	return state;
+}
+
 // Dispatches to the correct kernel function, passing the arguments.
 int32_t
 syscall(uint32_t syscallno, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, uint32_t a5)
@@ -522,6 +547,9 @@ syscall(uint32_t syscallno, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, 
 			break;
 		case SYS_ipc_recv:
 			ret = sys_ipc_recv((void *) a1, (int*)a2, (envid_t*)a3, (int*)a4);
+			break;
+		case SYS_msg_state:
+			ret = sys_env_msg_state((envid_t) a1);
 			break;
 		default:
 			ret = -E_INVAL;

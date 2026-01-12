@@ -27,7 +27,8 @@ ipc_recv(envid_t *from_env_store, void *pg, int *perm_store)
 	int r;
 	int val = 0;
 
-	while (is_empty(&thisenv->mailbox)) {
+	envid_t envid = thisenv->env_id;
+	while (sys_env_msg_state(envid) == MSG_EMPTY) {
 		sys_yield();
 	}
 
@@ -55,8 +56,8 @@ void
 ipc_send(envid_t to_env, uint32_t val, void *pg, int perm)
 {
 	int r;
-
-	while (is_full(&thisenv->mailbox)) {
+	envid_t envid = thisenv->env_id;
+	while (sys_env_msg_state(envid) == MSG_FULL) {
 		sys_yield();
 	}
 

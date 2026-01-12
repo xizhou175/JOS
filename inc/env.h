@@ -3,6 +3,7 @@
 #ifndef JOS_INC_ENV_H
 #define JOS_INC_ENV_H
 
+#include "kern/spinlock.h"
 #include <inc/types.h>
 #include <inc/trap.h>
 #include <inc/memlayout.h>
@@ -39,6 +40,12 @@ enum {
 	ENV_NOT_RUNNABLE
 };
 
+enum {
+	MSG_FREE = 0,
+	MSG_EMPTY,
+	MSG_FULL
+};
+
 // Special environment types
 enum EnvType {
 	ENV_TYPE_USER = 0,
@@ -54,34 +61,13 @@ struct Queue {
 	struct Message msg[NMSG];
 	int front;
 	int back;
+	struct spinlock q_lock;
 };
 
-static inline bool is_full(const struct Queue* q) {
-	return q->back == q->front || (q->front == -1 && q->back == NMSG - 1);
-}
-
-static inline bool is_empty(const struct Queue* q) {
-	return q->back - 1 == q->front;
-}
-
-static inline struct Message* enqueue(struct Queue* q) {
-	if (is_full(q)) {
-		return NULL;
-	}
-	struct Message *ret = &q->msg[q->back];
-	q->back = q->back + 1 >= NMSG ? 0 : q->back + 1;
-	return ret;
-}
-
-static inline struct Message* dequeue(struct Queue* q) {
-	if (is_empty(q)) {
-		return NULL;
-	}
-	q->front == NMSG - 1 ? -1 : q->front;
-	struct Message *msg = &q->msg[q->front + 1];
-	q->front++;
-	return msg;
-}
+bool is_full(const struct Queue* q);
+bool is_empty(const struct Queue* q);
+struct Message* enqueue(struct Queue* q);
+struct Message* dequeue(struct Queue* q);
 
 struct Env {
 	struct Trapframe env_tf;	// Saved registers
