@@ -71,22 +71,16 @@ void _env_destroy(struct Env *e);
 
 bool is_full(const struct Queue* q) {
 	spin_lock(&((struct Queue*)(q))->q_lock);
-	if (q->back == q->front || (q->front == -1 && q->back == NMSG - 1)) {
-		spin_unlock(&((struct Queue*)(q))->q_lock);
-		return true;
-	}
+	bool ret = q->size == NMSG;
 	spin_unlock(&((struct Queue*)(q))->q_lock);
-	return false;
+	return ret;
 }
 
 bool is_empty(const struct Queue* q) {
 	spin_lock(&((struct Queue*)(q))->q_lock);
-	if (q->back - 1 == q->front) {
-		spin_unlock(&((struct Queue*)(q))->q_lock);
-		return true;
-	}
+	bool ret = q->size == 0;
 	spin_unlock(&((struct Queue*)(q))->q_lock);
-	return false;
+	return ret;
 }
 
 struct Message* enqueue(struct Queue* q) {
@@ -95,7 +89,8 @@ struct Message* enqueue(struct Queue* q) {
 	}
 	spin_lock(&((struct Queue*)(q))->q_lock);
 	struct Message *ret = &q->msg[q->back];
-	q->back = q->back + 1 >= NMSG ? 0 : q->back + 1;
+	q->back = q->back >= NMSG - 1 ? 0 : q->back + 1;
+	q->size++;	
 	spin_unlock(&((struct Queue*)(q))->q_lock);
 	return ret;
 }
@@ -105,11 +100,21 @@ struct Message* dequeue(struct Queue* q) {
 		return NULL;
 	}
 	spin_lock(&((struct Queue*)(q))->q_lock);
-	q->front == NMSG - 1 ? -1 : q->front;
+	q->front = q->front == NMSG - 1 ? -1 : q->front;
 	struct Message *msg = &q->msg[q->front + 1];
 	q->front++;
+	q->size--;
 	spin_unlock(&((struct Queue*)(q))->q_lock);
 	return msg;
+}
+
+void print_queue(struct Queue* q) {
+	cprintf("\n");
+	for (int i = 0; i < NMSG; i++) {
+		cprintf("%u ", q->msg[i].env_ipc_value);
+	}
+	cprintf("\n");
+	cprintf("front: %d back: %d\n", q->front, q->back);
 }
 
 //
@@ -338,6 +343,7 @@ _env_alloc(struct Env **newenv_store, envid_t parent_id)
 
 	e->mailbox.front = -1;
 	e->mailbox.back = 0;
+	e->mailbox.size = 0;
 
 	cprintf("[%08x] new env %08x\n", curenv ? curenv->env_id : 0, e->env_id);
 	return 0;

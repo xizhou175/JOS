@@ -349,6 +349,7 @@ static int
 sys_ipc_try_send(envid_t envid, uint32_t value, void *srcva, unsigned perm)
 {
 	// LAB 4: Your code here.
+	//cprintf("sys_ipc_try_send\n");
 	struct Env *env;
 	int r;
 	struct PageInfo *pp;
@@ -360,16 +361,19 @@ sys_ipc_try_send(envid_t envid, uint32_t value, void *srcva, unsigned perm)
 		return r;
 	}
 
+	//cprintf("env %x size: %u\n", curenv->env_id, env->mailbox.size);
 	struct Message* msg = enqueue(&env->mailbox);
+	//cprintf("env %x size: %u\n", curenv->env_id, env->mailbox.size);
 
-	//if (msg == NULL) {
-	//	spin_unlock(&env_lock);
-	//	return -E_IPC_NOT_RECV;
-	//}
+	if (msg == NULL) {
+		spin_unlock(&env_lock);
+		return -E_IPC_MSG_NOT_FREE;
+	}
 
 	msg->env_ipc_perm = perm;
 	msg->env_ipc_from = curenv->env_id;
 	msg->env_ipc_value = value;
+	//print_queue(&env->mailbox);
 
 	if ((uintptr_t) srcva < UTOP) {
 		if (PGOFF(srcva) != 0) {
@@ -392,7 +396,7 @@ sys_ipc_try_send(envid_t envid, uint32_t value, void *srcva, unsigned perm)
 		}
 	}
 
-	env->env_status = ENV_RUNNABLE;
+	//env->env_status = ENV_RUNNABLE;
 	env->env_tf.tf_regs.reg_eax = 0;
 	spin_unlock(&env_lock);
 
@@ -442,13 +446,21 @@ sys_ipc_try_send(envid_t envid, uint32_t value, void *srcva, unsigned perm)
 // Return < 0 on error.  Errors are:
 //	-E_INVAL if dstva < UTOP but dstva is not page-aligned.
 static int
-sys_ipc_recv(void *dstva, int* val, envid_t *from_env_store, int *perm_store)
+sys_ipc_recv(void *dstva, envid_t *from_env_store, int *perm_store)
 {
 	// LAB 4: Your code here.
+	//cprintf("sys_ipc_recv\n");
 	spin_lock(&env_lock);
-
+	//cprintf("env %x size: %u\n", curenv->env_id, curenv->mailbox.size);
 	struct Message* msg = dequeue(&curenv->mailbox);
-	*val = msg->env_ipc_value;
+	if (msg == NULL) {
+		spin_unlock(&env_lock);
+		return -E_IPC_MSG_NOT_FREE;
+	}
+	//cprintf("env %x size: %u\n", curenv->env_id, curenv->mailbox.size);
+	curenv->env_ipc_value = msg->env_ipc_value;
+
+	//print_queue(&curenv->mailbox);
 
 	if (from_env_store != NULL) {
 		*from_env_store = msg->env_ipc_from;
@@ -468,7 +480,7 @@ sys_ipc_recv(void *dstva, int* val, envid_t *from_env_store, int *perm_store)
 		msg->pp->pp_ref--;
 		curenv->env_ipc_perm = msg->env_ipc_perm;
 	}
-	curenv->env_status = ENV_RUNNABLE;
+	//curenv->env_status = ENV_RUNNABLE;
 	spin_unlock(&env_lock);
 
 	return 0;
@@ -479,6 +491,7 @@ sys_env_msg_state(envid_t envid)
 {
 	int r;
 	struct Env *env;
+	//cprintf("sys_env_msg_state\n");
 	spin_lock(&env_lock);
 	if ((r = _envid2env(envid, &env, 0)) < 0) {
 		spin_unlock(&env_lock);
@@ -486,12 +499,15 @@ sys_env_msg_state(envid_t envid)
 	}
 	int state;
 	if (is_empty(&env->mailbox)) {
+		//cprintf("sys_env_msg_state: empty\n");
 		state = MSG_EMPTY;
 	}
 	else if (is_full(&env->mailbox)) {
+		//cprintf("sys_env_msg_state: full\n");
 		state = MSG_FULL;
 	}
 	else {
+		//cprintf("sys_env_msg_state: free\n");
 		state = MSG_FREE;
 	}
 	spin_unlock(&env_lock);
@@ -546,7 +562,7 @@ syscall(uint32_t syscallno, uint32_t a1, uint32_t a2, uint32_t a3, uint32_t a4, 
 			ret = sys_ipc_try_send((envid_t) a1, (uint32_t) a2, (void *) a3, (int) a4);
 			break;
 		case SYS_ipc_recv:
-			ret = sys_ipc_recv((void *) a1, (int*)a2, (envid_t*)a3, (int*)a4);
+			ret = sys_ipc_recv((void *) a1, (envid_t*)a2, (int*)a3);
 			break;
 		case SYS_msg_state:
 			ret = sys_env_msg_state((envid_t) a1);

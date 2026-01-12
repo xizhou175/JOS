@@ -70,7 +70,7 @@ duppage(envid_t envid, unsigned pn)
 	// LAB 4: Your code here.
 	uint32_t perm = uvpt[pn] & PTE_SYSCALL;
 	void *addr = (void *) (pn * PGSIZE);
-	cprintf("duppage: [%08x]\n", addr);
+	//cprintf("duppage: [%08x]\n", addr);
 
 	if ((perm & PTE_W) || (perm & PTE_COW)) {
 		perm |= PTE_COW;
@@ -98,7 +98,7 @@ duppage_s(envid_t envid, unsigned pn)
 	// LAB 4: Your code here.
 	uint32_t perm = uvpt[pn] & PTE_SYSCALL;
 	void *addr = (void *) (pn * PGSIZE);
-	cprintf("duppage_s: [%08x]\n", addr);
+	//cprintf("duppage_s: [%08x]\n", addr);
 
 	if ((r = sys_page_map(0, addr, envid, addr, perm)) < 0) {
 		return r;

@@ -29,7 +29,7 @@ typedef int32_t envid_t;
 #define LOG2NENV		10
 #define NENV			(1 << LOG2NENV)
 #define ENVX(envid)		((envid) & (NENV - 1))
-#define NMSG            20
+#define NMSG            10
 
 // Values of env_status in struct Env
 enum {
@@ -62,12 +62,14 @@ struct Queue {
 	int front;
 	int back;
 	struct spinlock q_lock;
+	int size;
 };
 
 bool is_full(const struct Queue* q);
 bool is_empty(const struct Queue* q);
 struct Message* enqueue(struct Queue* q);
 struct Message* dequeue(struct Queue* q);
+void print_queue(struct Queue* q);
 
 struct Env {
 	struct Trapframe env_tf;	// Saved registers

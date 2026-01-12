@@ -25,23 +25,32 @@ int32_t
 ipc_recv(envid_t *from_env_store, void *pg, int *perm_store)
 {
 	int r;
-	int val = 0;
 
 	envid_t envid = thisenv->env_id;
-	while (sys_env_msg_state(envid) == MSG_EMPTY) {
-		sys_yield();
-	}
-
-	if ((r = sys_ipc_recv(pg == NULL ? (void *)UTOP : pg, &val, from_env_store, perm_store)) < 0) {
-		if (from_env_store != NULL) {
-			*from_env_store = 0;
+	//while (sys_env_msg_state(envid) == MSG_EMPTY) {
+		//cprintf("msg empty: %x\n", envid);
+	//	sys_yield();
+	//}
+	//cprintf("msg recv env: %x\n", envid);
+	for(;;) {
+		if ((r = sys_ipc_recv(pg == NULL ? (void *)UTOP : pg, from_env_store, perm_store)) < 0) {
+			if (r == -E_IPC_MSG_NOT_FREE) {
+				sys_yield();
+				continue;
+			} else {
+				if (from_env_store != NULL) {
+					*from_env_store = 0;
+				}
+				if (perm_store != NULL) {
+					*perm_store = 0;
+				}
+				return r;
+			}
+		} else {
+			break;
 		}
-		if (perm_store != NULL) {
-			*perm_store = 0;
-		}
-		return r;
 	}
-	return val;
+	return thisenv->env_ipc_value;
 }
 
 // Send 'val' (and 'pg' with 'perm', if 'pg' is nonnull) to 'toenv'.
@@ -56,14 +65,21 @@ void
 ipc_send(envid_t to_env, uint32_t val, void *pg, int perm)
 {
 	int r;
-	envid_t envid = thisenv->env_id;
-	while (sys_env_msg_state(envid) == MSG_FULL) {
-		sys_yield();
-	}
-
+	
+	//envid_t envid = thisenv->env_id;
+	//while (sys_env_msg_state(to_env) == MSG_FULL) {
+		//cprintf("msg full: %x\n", to_env);
+	//	sys_yield();
+	//}
+	//cprintf("ipc_send val: %u  env: %x\n", val, thisenv->env_id);
 	pg = pg == NULL ? (void *) UTOP : pg;
 	//for (;;) {
+top:
 	if ((r = sys_ipc_try_send(to_env, val, pg, perm)) < 0) {
+		if (r == -E_IPC_MSG_NOT_FREE) {
+			sys_yield();
+			goto top;
+		}
 		if (r == -E_IPC_NOT_RECV) {
 			cprintf("Failed to send value: %u", val);
 			//continue;
@@ -74,6 +90,7 @@ ipc_send(envid_t to_env, uint32_t val, void *pg, int perm)
 		//break;
 	//}
 	//}
+	//sys_yield();
 }
 
 // Find the first environment of the given type.  We'll use this to

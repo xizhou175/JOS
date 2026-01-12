@@ -38,7 +38,11 @@ sched_yield(void)
 	cur = begin;
 
 	do {
+		//if ((envs + cur)->env_id != 0)
+		//	cprintf("env %x status %u\n", (envs + cur)->env_id, (envs + cur)->env_status);
 		if (envs[cur].env_status == ENV_RUNNABLE) {
+			//cprintf("=========================\n");
+			//cprintf("env %x run\n", (envs + cur)->env_id);
 			env_run(envs + cur);
 		}
 		cur = (cur + 1) % NENV;

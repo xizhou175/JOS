@@ -106,9 +106,9 @@ sys_ipc_try_send(envid_t envid, uint32_t value, void *srcva, int perm)
 }
 
 int
-sys_ipc_recv(void *dstva, void *val, void *from_env, void* perm)
+sys_ipc_recv(void *dstva, void *from_env, void* perm)
 {
-	return syscall(SYS_ipc_recv, 1, (uint32_t)dstva, (uint32_t)val, (uint32_t)from_env, (uint32_t)perm, 0);
+	return syscall(SYS_ipc_recv, 0, (uint32_t)dstva, (uint32_t)from_env, (uint32_t)perm, 0, 0);
 }
 
 int
